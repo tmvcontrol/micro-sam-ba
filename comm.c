@@ -17,10 +17,122 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
-#include <termios.h>
 #include <unistd.h>
 #include "comm.h"
 #include "utils.h"
+
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
+#include <Windows.h>
+
+HANDLE hSerial;
+char lastError[1024];
+
+char * get_error()
+{
+	FormatMessage(
+		FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+		NULL,
+		GetLastError(),
+		MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+		lastError,
+		1024,
+		NULL);
+	return lastError;
+}
+
+int samba_open(const char* device)
+{
+	hSerial = CreateFile(device,
+		GENERIC_READ | GENERIC_WRITE,
+		0,
+		0,
+		OPEN_EXISTING,
+		FILE_ATTRIBUTE_NORMAL,
+		0);
+	if (hSerial == INVALID_HANDLE_VALUE) {
+		if (GetLastError() == ERROR_FILE_NOT_FOUND) {
+			//serial port does not exist. Inform user.
+			fprintf(stderr, "Port %s does not exist", device);
+			return -1;
+		}
+		//some other error occurred. Inform user.
+		perror("Could not open device");
+		return -1;
+	}
+
+	DCB dcbSerialParams = { 0 };
+	dcbSerialParams.DCBlength = sizeof(dcbSerialParams);
+	if (!GetCommState(hSerial, &dcbSerialParams)) {
+		//error getting state
+	}
+	dcbSerialParams.BaudRate = CBR_19200;
+	dcbSerialParams.ByteSize = 8;
+	dcbSerialParams.StopBits = ONESTOPBIT;
+	dcbSerialParams.Parity = NOPARITY;
+	if (!SetCommState(hSerial, &dcbSerialParams)) {
+		//error setting serial port state
+		perror("Could not set serial port state");
+		return -1;
+	}
+
+	COMMTIMEOUTS timeouts = { 0 };
+	timeouts.ReadIntervalTimeout = 50;
+	timeouts.ReadTotalTimeoutConstant = 50;
+	timeouts.ReadTotalTimeoutMultiplier = 10;
+	timeouts.WriteTotalTimeoutConstant = 50;
+	timeouts.WriteTotalTimeoutMultiplier = 10;
+	if (!SetCommTimeouts(hSerial, &timeouts)) {
+		//error occureed. Inform user
+		perror("Could not set serial port timeouts");
+		return -1;
+	}
+
+	return 1;
+}
+
+void samba_close(int fd)
+{
+	if(fd > 0) CloseHandle(hSerial);
+}
+
+inline int SerialRead(int fd, void * buffer, unsigned int count)
+{
+	DWORD dwBytesRead = 0;
+	
+	if (fd <= 0) {
+		perror("Serial port not open!");
+		return -1;
+	}
+	
+	if (!ReadFile(hSerial, buffer, count, &dwBytesRead, NULL)) {
+		//error occurred. Report to user.
+		perror("Read Error occured");
+		return -1;
+	}
+
+	return (int)dwBytesRead;
+}
+
+inline int SerialWrite(int fd, void const* buffer, unsigned int count)
+{
+	DWORD dwBytesWritten = 0;
+
+	if (fd <= 0) {
+		perror("Serial port not open!");
+		return -1;
+	}
+
+	if (!WriteFile(hSerial, buffer, count, &dwBytesWritten, NULL)) {
+		//error occurred. Report to user.
+		perror("Write Error occured");
+		return -1;
+	}
+
+	return (int)dwBytesWritten;
+}
+
+#else
+#include <termios.h>
 
 static bool configure_tty(int fd, int speed)
 {
@@ -70,7 +182,7 @@ int samba_open(const char* device)
 		return -1;
 	}
 
-	if (!configure_tty(fd, B4000000)) {
+	if (!configure_tty(fd, 0xB4000000)) {
 		close(fd);
 		return -1;
 	}
@@ -88,20 +200,25 @@ void samba_close(int fd)
 	close(fd);
 }
 
+#define SerialRead(fd, buffer, count) read(fd, buffer, count)
+#define SerialWrite(fd, buffer, count) write(fd, buffer, count)
+
+#endif
+
 bool samba_read_word(int fd, uint32_t addr, uint32_t* value)
 {
 	char cmd[12];
 	snprintf(cmd, sizeof(cmd), "w%08x,#", addr);
-	if (write(fd, cmd, strlen(cmd)) != strlen(cmd))
+	if (SerialWrite(fd, cmd, strlen(cmd)) != strlen(cmd))
 		return false;
-	return read(fd, value, 4) == 4;
+	return SerialRead(fd, value, 4) == 4;
 }
 
 bool samba_write_word(int fd, uint32_t addr, uint32_t value)
 {
 	char cmd[20];
 	snprintf(cmd, sizeof(cmd), "W%08x,%08x#", addr, value);
-	return write(fd, cmd, strlen(cmd)) == strlen(cmd);
+	return SerialWrite(fd, cmd, strlen(cmd)) == strlen(cmd);
 }
 
 bool samba_read(int fd, uint8_t* buffer, uint32_t addr, uint32_t size)
@@ -112,10 +229,14 @@ bool samba_read(int fd, uint8_t* buffer, uint32_t addr, uint32_t size)
 		// workaround for bug when size is exactly 512
 		if (count == 512)
 			count = 1;
+		// workaround for other bug when size is exactly 1024
+		if (count == 1024)
+			count = 1024 - 1;
 		snprintf(cmd, sizeof(cmd), "R%08x,%08x#", addr, count);
-		if (write(fd, cmd, strlen(cmd)) != strlen(cmd))
+		printf("%s\n", cmd);
+		if (SerialWrite(fd, cmd, strlen(cmd)) != strlen(cmd))
 			return false;
-		if (read(fd, buffer, count) != count)
+		if (SerialRead(fd, buffer, count) != count)
 			return false;
 		addr += count;
 		buffer += count;
@@ -133,9 +254,9 @@ bool samba_write(int fd, uint8_t* buffer, uint32_t addr, uint32_t size)
 		if (count == 512)
 			count = 1;
 		snprintf(cmd, sizeof(cmd), "S%08x,%08x#", addr, count);
-		if (write(fd, cmd, strlen(cmd)) != strlen(cmd))
+		if (SerialWrite(fd, cmd, strlen(cmd)) != strlen(cmd))
 			return false;
-		if (write(fd, buffer, count) != count)
+		if (SerialWrite(fd, buffer, count) != count)
 			return false;
 		buffer += count;
 		size -= count;

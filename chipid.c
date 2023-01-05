@@ -37,6 +37,7 @@ static const struct _chip _chips_samx7[] = {
 	{ "SAMS70J19", 0xa11d0a00, 0x00000000, 0x400e0c00, 0x00400000,  512, 9 },
 	{ "SAMV71Q21", 0xa1220e00, 0x00000002, 0x400e0c00, 0x00400000, 2048, 9 },
 	{ "SAMV71Q20", 0xa1220c00, 0x00000002, 0x400e0c00, 0x00400000, 1024, 9 },
+	{ "SAMV71Q20B", 0xa1220c01, 0x00000002, 0x400e0c00, 0x00400000, 1024, 9 },
 	{ "SAMV71Q19", 0xa12d0a00, 0x00000002, 0x400e0c00, 0x00400000,  512, 9 },
 	{ "SAMV71N21", 0xa1220e00, 0x00000001, 0x400e0c00, 0x00400000, 2048, 9 },
 	{ "SAMV71N20", 0xa1220c00, 0x00000001, 0x400e0c00, 0x00400000, 1024, 9 },
@@ -79,8 +80,10 @@ bool chipid_check_serie(int fd, const struct _chip_serie* serie, const struct _c
 	if (!samba_read_word(fd, serie->exid_reg, &exid))
 		return false;
 
+	printf("check_serie: 0x%08x, 0x%08x\n", cidr, exid);
+
 	// Identify chip and read its flash infos
-	for (int i = 0; i < serie->nb_chips; i++) {
+	for (uint32_t i = 0; i < serie->nb_chips; i++) {
 		if (serie->chips[i].cidr == cidr && serie->chips[i].exid == exid) {
 			*chip = &serie->chips[i];
 			return true;

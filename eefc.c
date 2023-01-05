@@ -111,7 +111,7 @@ bool eefc_read_flash_info(int fd, const struct _chip* chip,
 	uint32_t nb_planes, plane_size;
 	if (!eefc_read_result(fd, chip, &nb_planes))
 		return false;
-	for (int i = 0; i < nb_planes; i++)
+	for (uint32_t i = 0; i < nb_planes; i++)
 		if (!eefc_read_result(fd, chip, &plane_size))
 			return false;
 
@@ -120,7 +120,7 @@ bool eefc_read_flash_info(int fd, const struct _chip* chip,
 		return false;
 	if (locks->count > MAX_EEFC_LOCKS)
 		return false;
-	for (int i = 0; i < locks->count; i++)
+	for (uint32_t i = 0; i < locks->count; i++)
 		if (!eefc_read_result(fd, chip, &locks->size[i]))
 			return false;
 
@@ -159,7 +159,7 @@ static bool set_lock(int fd, const struct _chip* chip,
 	uint32_t addr_end = addr + size;
 
 	uint32_t offset = 0;
-	for (int lock = 0; lock < locks->count; lock++) {
+	for (uint32_t lock = 0; lock < locks->count; lock++) {
 		uint32_t next_offset = offset + locks->size[lock];
 		if (addr >= offset && addr < next_offset) {
 			if (!set_page_lock(fd, chip, locks, lock, enable))
@@ -233,8 +233,10 @@ bool eefc_erase_16pages(int fd, const struct _chip* chip,
 bool eefc_read(int fd, const struct _chip* chip,
 		uint8_t* buffer, uint32_t addr, uint32_t size)
 {
-	if (addr + size > chip->flash_size * 1024)
+	if (addr + size > chip->flash_size * 1024) {
+		fprintf(stderr, "addr (0x%8x) + size (0x%8x) must be greater than (0x%8x) \n", addr, size, chip->flash_size * 1024);
 		return false;
+	}
 
 	return samba_read(fd, buffer, chip->flash_addr + addr, size);
 }

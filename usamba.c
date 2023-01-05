@@ -51,6 +51,7 @@ static bool read_flash(int fd, const struct _chip* chip, uint32_t addr, uint32_t
 	while (total < size) {
 		uint32_t count = MIN(BUFFER_SIZE, size - total);
 		if (!eefc_read(fd, chip, buffer, addr, count)) {
+			fprintf(stderr, "Error while reading from device\n");
 			fclose(file);
 			return false;
 		}

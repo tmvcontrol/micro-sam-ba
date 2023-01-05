@@ -3,3 +3,7 @@ GRTAGS
 GTAGS
 *.o
 *~
+/Debug
+/x64/Debug
+/.vs
+/MicroSamBa.vcxproj.user
