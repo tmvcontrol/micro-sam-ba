@@ -46,4 +46,5 @@ for all commands:
 # Platforms
 
 This version supports Windows
+
 Linux support is currently untested, but it was working several versions ago. 
