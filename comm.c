@@ -72,7 +72,7 @@ int samba_open(const char* device)
 	if (!GetCommState(hSerial, &dcbSerialParams)) {
 		//error getting state
 	}
-	dcbSerialParams.BaudRate = CBR_19200;
+	dcbSerialParams.BaudRate = CBR_115200;
 	dcbSerialParams.ByteSize = 8;
 	dcbSerialParams.StopBits = ONESTOPBIT;
 	dcbSerialParams.Parity = NOPARITY;
@@ -196,7 +196,7 @@ int samba_open(const char* device)
 		return -1;
 	}
 
-	if (!configure_tty(fd, 0xB4000000)) {
+	if (!configure_tty(fd, 0xB115200)) {
 		close(fd);
 		return -1;
 	}
