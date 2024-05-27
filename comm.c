@@ -21,11 +21,15 @@
 #include "comm.h"
 #include "utils.h"
 
+static bool switch_to_binary(int fd);
+
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
 #include <Windows.h>
 
 HANDLE hSerial;
 char lastError[1024];
+
+char deviceFullName[1024];
 
 char * get_error()
 {
@@ -42,7 +46,10 @@ char * get_error()
 
 int samba_open(const char* device)
 {
-	hSerial = CreateFile(device,
+	strcpy(deviceFullName, "\\\\.\\");
+	strncat(deviceFullName, device, sizeof(deviceFullName));
+
+	hSerial = CreateFile(deviceFullName,
 		GENERIC_READ | GENERIC_WRITE,
 		0,
 		0,
@@ -84,6 +91,13 @@ int samba_open(const char* device)
 	if (!SetCommTimeouts(hSerial, &timeouts)) {
 		//error occureed. Inform user
 		perror("Could not set serial port timeouts");
+		return -1;
+	}
+
+	if (!switch_to_binary(1)) {
+		//error occureed. Inform user
+		perror("Could not switch to binary mode");
+		CloseHandle(hSerial);
 		return -1;
 	}
 
@@ -166,13 +180,13 @@ static bool configure_tty(int fd, int speed)
 	return true;
 }
 
-static bool switch_to_binary(int fd)
+/*static bool switch_to_binary(int fd)
 {
 	char cmd[] = "N#";
 	if (write(fd, cmd, strlen(cmd)) != strlen(cmd))
 		return false;
 	return read(fd, cmd, 2) == 2;
-}
+}*/
 
 int samba_open(const char* device)
 {
@@ -204,6 +218,14 @@ void samba_close(int fd)
 #define SerialWrite(fd, buffer, count) write(fd, buffer, count)
 
 #endif
+
+static bool switch_to_binary(int fd)
+{
+	char cmd[] = "N#";
+	if (SerialWrite(fd, cmd, strlen(cmd)) != strlen(cmd))
+		return false;
+	return SerialRead(fd, cmd, 2) == 2;
+}
 
 bool samba_read_word(int fd, uint32_t addr, uint32_t* value)
 {

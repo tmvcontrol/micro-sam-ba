@@ -102,6 +102,11 @@
       <AdditionalIncludeDirectories>C:\Users\zvanderklippe\Documents\sw\trunk\VS2019\MicroSamBa\libunistd\unistd;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
   </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>C:\Users\zvanderklippe\Documents\sw\trunk\VS2019\MicroSamBa\libunistd\unistd;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+  </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="chipid.c" />
     <ClCompile Include="comm.c" />

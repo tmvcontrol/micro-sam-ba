@@ -191,7 +191,7 @@ int main(int argc, char *argv[])
 	if (argc < 3) {
 		fprintf(stderr, "Error: not enough arguments\n");
 		usage(argv[0]);
-		return -1;
+		goto err_args;
 	}
 	port = argv[1];
 	char* cmd_text = argv[2];
@@ -255,7 +255,7 @@ int main(int argc, char *argv[])
 	}
 	if (err) {
 		usage(argv[0]);
-		return -1;
+		goto err_args;
 	}
 
 	err = true;
@@ -263,30 +263,30 @@ int main(int argc, char *argv[])
 	printf("Port: %s\n", port);
 	fd = samba_open(port);
 	if (fd < 0)
-		return -1;
+		goto no_port;
 
 	// Identify chip
-	const struct _chip* chip;
+	struct _chip chip;
 	if (!chipid_identity_serie(fd, &chip)) {
 		fprintf(stderr, "Could not identify chip\n");
 		goto exit;
 	}
-	printf("Device: Atmel %s\n", chip->name);
+	printf("Device: Atmel %s%c\n", chip.name, chip.rev_char);
 
 	// Read and check flash information
 	struct _eefc_locks locks;
-	if (!eefc_read_flash_info(fd, chip, &locks)) {
+	if (!eefc_read_flash_info(fd, &chip, &locks)) {
 		fprintf(stderr, "Could not read flash information\n");
 		goto exit;
 	}
-	printf("Flash Size: %uKB\n", chip->flash_size);
+	printf("Flash Size: %uKB\n", chip.flash_size);
 
 	// Execute command
 	switch (command) {
 		case CMD_READ:
 		{
 			printf("Reading %d bytes at 0x%08x to file '%s'\n", size, addr, filename);
-			if (read_flash(fd, chip, addr, size, filename)) {
+			if (read_flash(fd, &chip, addr, size, filename)) {
 				err = false;
 			}
 			break;
@@ -296,9 +296,9 @@ int main(int argc, char *argv[])
 		{
 			if (get_file_size(filename, &size)) {
 				printf("Unlocking %d bytes at 0x%08x\n", size, addr);
-				if (eefc_unlock(fd, chip, &locks, addr, size)) {
+				if (eefc_unlock(fd, &chip, &locks, addr, size)) {
 					printf("Writing %d bytes at 0x%08x from file '%s'\n", size, addr, filename);
-					if (write_flash(fd, chip, filename, addr, size)) {
+					if (write_flash(fd, &chip, filename, addr, size)) {
 						err = false;
 					}
 				}
@@ -310,7 +310,7 @@ int main(int argc, char *argv[])
 		{
 			if (get_file_size(filename, &size)) {
 				printf("Verifying %d bytes at 0x%08x with file '%s'\n", size, addr, filename);
-				if (verify_flash(fd, chip, filename, addr, size)) {
+				if (verify_flash(fd, &chip, filename, addr, size)) {
 					err = false;
 				}
 			}
@@ -320,9 +320,9 @@ int main(int argc, char *argv[])
 		case CMD_ERASE_ALL:
 		{
 			printf("Unlocking all pages\n");
-			if (eefc_unlock(fd, chip, &locks, 0, chip->flash_size * 1024)) {
+			if (eefc_unlock(fd, &chip, &locks, 0, chip.flash_size * 1024)) {
 				printf("Erasing all pages\n");
-				if (eefc_erase_all(fd, chip)) {
+				if (eefc_erase_all(fd, &chip)) {
 					err = false;
 				}
 			}
@@ -333,7 +333,7 @@ int main(int argc, char *argv[])
 		{
 			printf("Getting GPNVM%d\n", addr);
 			bool value;
-			if (eefc_get_gpnvm(fd, chip, addr, &value)) {
+			if (eefc_get_gpnvm(fd, &chip, addr, &value)) {
 				printf("GPNVM%d is %s\n", addr, value ? "set" : "clear");
 				err = false;
 			}
@@ -348,7 +348,7 @@ int main(int argc, char *argv[])
 				fprintf(stderr, "variable with any value and try again.\n");
 			} else {
 				printf("Setting GPNVM%d\n", addr);
-				if (eefc_set_gpnvm(fd, chip, addr)) {
+				if (eefc_set_gpnvm(fd, &chip, addr)) {
 					err = false;
 				}
 			}
@@ -358,7 +358,7 @@ int main(int argc, char *argv[])
 		case CMD_GPNVM_CLEAR:
 		{
 			printf("Clearing GPNVM%d\n", addr);
-			if (eefc_clear_gpnvm(fd, chip, addr)) {
+			if (eefc_clear_gpnvm(fd, &chip, addr)) {
 				err = false;
 			}
 			break;
@@ -370,8 +370,8 @@ exit:
 	samba_close(fd);
 	if (err) {
 		fprintf(stderr, "Operation failed\n");
-		return -1;
-	} else {
-		return 0;
 	}
+err_args:
+no_port:
+    return err ? -1 : 0;
 }

@@ -19,6 +19,7 @@
 
 struct _chip {
 	const char* name;
+	char  rev_char;
 	uint32_t    cidr;
 	uint32_t    exid;
 	uint32_t    eefc_base;
@@ -31,14 +32,15 @@ struct _chip_serie {
 	const char*         name;
 	uint32_t            cidr_reg;
 	uint32_t            exid_reg;
+	uint32_t            nb_hw_ver;
 	uint32_t            nb_chips;
 	const struct _chip* chips;
 };
 
 extern const struct _chip_serie* chipid_get_serie(const char* name);
 
-extern bool chipid_check_serie(int fd, const struct _chip_serie* serie, const struct _chip** chip);
+extern bool chipid_check_serie(int fd, const struct _chip_serie* serie, struct _chip* chip);
 
-extern const struct _chip_serie* chipid_identity_serie(int fd, const struct _chip** chip);
+extern const struct _chip_serie* chipid_identity_serie(int fd, struct _chip* chip);
 
 #endif /* CHIPID_H_ */
