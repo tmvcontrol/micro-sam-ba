@@ -8,7 +8,9 @@ microcontrollers:
 
   - Atmel SAME70/S70/V70/V71
 
-Communication with SAM-BA bootloader is only supported through USB.
+Communication with SAM-BA bootloader is possible over
+  - USB
+  - UART/RS232
 
 Before using the tool, the MCU must be put in "Boot from ROM" mode, either by
 fully erasing it using the ERASE pin or by clearing GPVNM1 (see datasheet for
@@ -40,3 +42,8 @@ for all commands:
          example ``/dev/ttyACM0``.
     ``<start-address>`` and ``<size>`` can be specified in decimal, hexadecimal (if
          prefixed by ``0x``) or octal (if prefixed by ``0``).
+
+# Platforms
+
+This version supports Windows
+Linux support is currently untested, but it was working several versions ago. 
